@@ -129,3 +129,107 @@ CREATE TABLE points (
     FOREIGN KEY (report_id) REFERENCES reports(id)
 );
 
+Στο περίπου... Αγάπη εσυ είσαι ο ειδικός σε αυτά!!
+
+Triggers:
+
+1)AFTER UPDATE ON reports.status
+
+If status = "Completed":
+
+Notify user
+
+Award points
+
+If status = "Rejected"/"False Report":
+
+Notify user
+
+Deduct points
+
+2)AFTER INSERT ON reports
+
+Notify user: "Your report has been submitted."
+
+3)AFTER INSERT ON points
+
+Recalculate and update cityzen.points total
+
+4)AFTER INSERT ON municipality_post
+
+Notify all users: "New announcement posted."
+
+5)AFTER INSERT ON ai_chat
+
+Log message
+
+If feedback rating exists, update satisfaction stats
+
+
+Procedures:
+
+1)SubmitReport
+
+Inputs: cityzen_id, location details, description, category, priority
+
+Inserts into location, then reports
+
+Creates a user notification
+
+2)UpdateReportStatus
+
+Inputs: report_id, new_status
+
+Updates report status
+
+Handles point rewards/penalties
+
+Sends status update notification
+
+3)AwardPoints
+
+Inputs: user_id, report_id (optional), points, reason
+
+Inserts into points
+
+Updates cityzen.points total
+
+4)SubmitRequest
+
+Inputs: cityzen_id, municipality_id, description
+
+Inserts into requests
+
+Notifies the municipality
+
+5)PublishMunicipalityPost
+
+Inputs: municipality_id, title, content
+
+Inserts into municipality_post
+
+Notifies all users
+
+6)HandleFalseReport
+
+Inputs: report_id, is_false
+
+Marks report as false/rejected
+
+Deducts points from user
+
+Sends warning notification
+
+7)GetUserReportHistory
+
+Inputs: cityzen_id
+
+Returns all reports with status and comments
+
+8)SubmitFeedback
+
+Inputs: cityzen_id, report_id, rating, comment
+
+Inserts into ai_chat or feedback log
+
+
