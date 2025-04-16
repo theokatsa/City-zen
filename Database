@@ -1,0 +1,154 @@
+DROP DATABASE IF EXISTS Cityzen;
+CREATE DATABASE Cityzen;
+USE Cityzen;
+
+-- Table for Users
+CREATE TABLE user (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    telephone_number VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    role enum ('citizen' , 'municipality') NOT NULL
+);
+
+-- Table for citizens
+CREATE TABLE citizen (
+    id INT AUTO_INCREMENT PRIMARY KEY ,
+    user_id INT NOT NULL UNIQUE,
+    points INT DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+);
+
+-- Table for Municipality/Public Authorities
+CREATE TABLE municipality (
+    id INT AUTO_INCREMENT PRIMARY KEY ,
+    user_id INT NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    contact_email VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+);
+
+-- Table for Location
+CREATE TABLE location (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    latitude DOUBLE NOT NULL,
+    longitude DOUBLE NOT NULL,
+    address VARCHAR(255) NOT NULL
+);
+
+-- Table for Reports
+CREATE TABLE report (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    citizen_id INT NOT NULL,
+    location_id INT NOT NULL,
+    category ENUM('Lighting', 'Roadworks', 'Other') NOT NULL DEFAULT 'Other',
+    description TEXT NOT NULL,
+    priority ENUM('High', 'Medium', 'Low') NOT NULL DEFAULT 'Medium',
+    status ENUM('Pending', 'In Progress', 'Completed') NOT NULL DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id),
+    FOREIGN KEY (location_id) REFERENCES location(id)
+);
+
+CREATE INDEX idx_citizen_id ON citizen(user_id);
+CREATE INDEX idx_report_citizen_id ON report(citizen_id);
+
+-- Table for Municipality Announcements
+CREATE TABLE municipality_post (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    municipality_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    text TEXT NOT NULL,
+    media_url VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (municipality_id) REFERENCES municipality(id)
+);
+
+-- Table for AI conversation
+CREATE TABLE ai_conversation (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    citizen_id INT NOT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    resolved BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id)
+);
+
+-- Table for AI Chat
+CREATE TABLE ai_chat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    conversation_id INT NOT NULL,
+    citizen_id INT NOT NULL,
+    message TEXT NOT NULL,
+    is_user BOOLEAN NOT NULL,  
+    report_id INT,             
+    action_type ENUM('submit_report', 'check_status', 'get_info', 'feedback', 'other'),
+    feedback_rating TINYINT,  
+    user_feedback TEXT,        
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES ai_conversation(id) ON DELETE CASCADE,
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id),
+    FOREIGN KEY (report_id) REFERENCES report(id)
+);
+
+-- Table for Notifications
+CREATE TABLE notification (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    citizen_id INT NOT NULL,
+    report_id INT DEFAULT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    action_type ENUM(
+        'report_submitted',
+        'status_updated',
+        'points_awarded',
+        'points_deducted',
+        'admin_announcement',
+        'general'
+    ) NOT NULL,
+    link_url VARCHAR(255),
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id),
+    FOREIGN KEY (report_id) REFERENCES report(id)
+);
+
+CREATE INDEX idx_action_type ON notification(action_type);
+
+-- Table for Requests
+CREATE TABLE request (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    citizen_id INT NOT NULL,
+    municipality_id INT NOT NULL,
+    description TEXT NOT NULL,
+    status ENUM('Pending', 'Approved', 'Rejected') NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id),
+    FOREIGN KEY (municipality_id) REFERENCES municipality(id)
+);
+
+-- Table for citizen Comments
+CREATE TABLE citizen_comment (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    report_id INT NOT NULL,
+    citizen_id INT NOT NULL,
+    comment TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (report_id) REFERENCES report(id),
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id)
+);
+
+-- Table for Points (Awarded/Deducted Points)
+CREATE TABLE points (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    citizen_id INT NOT NULL,
+    report_id INT DEFAULT NULL,
+    points_awarded INT NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id),
+    FOREIGN KEY (report_id) REFERENCES report(id)
+);
