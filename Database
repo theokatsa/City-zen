@@ -53,6 +53,34 @@ CREATE TABLE report (
     FOREIGN KEY (location_id) REFERENCES location(id)
 );
 
+CREATE TABLE report_media (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    report_id INT NOT NULL,
+    media_url VARCHAR(500) NOT NULL,
+    media_type ENUM('image', 'video') DEFAULT 'image',
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (report_id) REFERENCES report(id) ON DELETE CASCADE
+);
+
+DELIMITER //
+CREATE TRIGGER prevent_last_media_deletion
+BEFORE DELETE ON report_media
+FOR EACH ROW
+BEGIN
+    DECLARE remaining_media INT;
+
+    SELECT COUNT(*) INTO remaining_media
+    FROM report_media
+    WHERE report_id = OLD.report_id;
+
+    IF remaining_media <= 1 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Each report must have at least one media file.';
+    END IF;
+END;
+//
+DELIMITER ;
+
 CREATE INDEX idx_citizen_id ON citizen(user_id);
 CREATE INDEX idx_report_citizen_id ON report(citizen_id);
 
@@ -152,3 +180,55 @@ CREATE TABLE points (
     FOREIGN KEY (citizen_id) REFERENCES citizen(id),
     FOREIGN KEY (report_id) REFERENCES report(id)
 );
+
+
+-- PROCEDURES -- 
+/* Υποβολή Αναφοράς */
+
+DELIMITER //
+
+CREATE PROCEDURE submit_report_with_media (
+    IN p_citizen_id INT,
+    IN p_latitude DOUBLE,
+    IN p_longitude DOUBLE,
+    IN p_address VARCHAR(255),
+    IN p_category ENUM('Lighting', 'Roadworks', 'Other'),
+    IN p_description TEXT,
+    IN p_priority ENUM('High', 'Medium', 'Low'),
+    IN p_media_url VARCHAR(500),
+    IN p_media_type ENUM('image', 'video'),
+    OUT p_report_id INT
+)
+BEGIN
+    DECLARE v_location_id INT;
+
+    -- 1. Εισαγωγή τοποθεσίας
+    INSERT INTO location (latitude, longitude, address)
+    VALUES (p_latitude, p_longitude, p_address);
+    SET v_location_id = LAST_INSERT_ID();
+
+    -- 2. Εισαγωγή αναφοράς με status 'Pending'
+    INSERT INTO report (
+        citizen_id,
+        location_id,
+        category,
+        description,
+        priority,
+        status
+    ) VALUES (
+        p_citizen_id,
+        v_location_id,
+        p_category,
+        p_description,
+        p_priority,
+        'Pending'
+    );
+    SET p_report_id = LAST_INSERT_ID();
+
+    -- 3. Εισαγωγή media (τουλάχιστον 1)
+    INSERT INTO report_media (report_id, media_url, media_type)
+    VALUES (p_report_id, p_media_url, p_media_type);
+END;
+//
+
+DELIMITER ;
