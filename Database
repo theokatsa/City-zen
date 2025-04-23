@@ -39,7 +39,7 @@ CREATE TABLE reports (
     location_id INT NOT NULL,
     category ENUM('lighting', 'roadworks', 'other') NOT NULL DEFAULT 'other',
     description TEXT NOT NULL,
-    priority ENUM('High', 'Medium', 'Low') NOT NULL DEFAULT 'medium',
+    priority ENUM('High', 'Medium', 'Low') NOT NULL DEFAULT 'Medium',
     status ENUM('Pending', 'In Progress', 'Completed') NOT NULL DEFAULT 'Pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cityzen_id) REFERENCES cityzen(id),
@@ -71,6 +71,37 @@ CREATE TABLE ai_chat (
     FOREIGN KEY (cityzen_id) REFERENCES cityzen(id),
     FOREIGN KEY (report_id) REFERENCES report(id)
 );
+
+
+--Corrected approach for chat with extra table 
+CREATE TABLE ai_chat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    conversation_id INT NOT NULL,
+    cityzen_id INT NOT NULL,
+    message TEXT NOT NULL,
+    is_user BOOLEAN NOT NULL,  -- TRUE = user, FALSE = AI
+    report_id INT,             -- Optional: linked to a report
+    action_type ENUM('submit_report', 'check_status', 'get_info', 'feedback', 'other'),
+    feedback_rating TINYINT,   -- 1 to 5
+    user_feedback TEXT,        -- Optional comment
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES ai_conversation(id) ON DELETE CASCADE,
+    FOREIGN KEY (cityzen_id) REFERENCES cityzen(id),
+    FOREIGN KEY (report_id) REFERENCES reports(id)
+);
+CREATE TABLE ai_conversation (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cityzen_id INT NOT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP NULL,
+    topic VARCHAR(255), -- optional: general topic of the chat (e.g., "lighting issue")
+    FOREIGN KEY (cityzen_id) REFERENCES cityzen(id)
+);
+
+Table	                  Role	                     Stores
+ai_conversation	          Session-level	             One row per chat session (like a thread)
+ai_chat	                  Message-level	             All individual messages (linked to session)
+--
 
 
 -- Table for Notifications
