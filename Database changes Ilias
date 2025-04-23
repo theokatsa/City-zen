@@ -1,0 +1,64 @@
+-- INDEXES
+
+-- USERS
+CREATE UNIQUE INDEX idx_users_email ON users(email);
+
+-- CITYZEN
+CREATE INDEX idx_cityzen_user_id ON cityzen(user_id);
+
+-- REPORTS
+CREATE INDEX idx_reports_cityzen_id ON reports(cityzen_id);
+CREATE INDEX idx_reports_location_id ON reports(location_id);
+CREATE INDEX idx_reports_status ON reports(status);
+CREATE INDEX idx_reports_priority ON reports(priority);
+
+-- MUNICIPALITY_POST
+CREATE INDEX idx_post_municipality_id ON municipality_post(municipality_id);
+
+-- AI_CHAT
+CREATE INDEX idx_chat_conversation_id ON ai_chat(conversation_id);
+CREATE INDEX idx_chat_cityzen_id ON ai_chat(cityzen_id);
+CREATE INDEX idx_chat_report_id ON ai_chat(report_id);
+
+-- NOTIFICATIONS
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_report_id ON notifications(report_id);
+
+-- REQUESTS
+CREATE INDEX idx_requests_cityzen_id ON requests(cityzen_id);
+CREATE INDEX idx_requests_municipality_id ON requests(municipality_id);
+CREATE INDEX idx_requests_status ON requests(status);
+
+-- CITYZEN_COMMENT
+CREATE INDEX idx_comment_report_id ON cityzen_comment(report_id);
+CREATE INDEX idx_comment_cityzen_id ON cityzen_comment(cityzen_id);
+
+-- POINTS
+CREATE INDEX idx_points_user_id ON points(user_id);
+CREATE INDEX idx_points_report_id ON points(report_id);
+
+-- UPDATED AT 
+-- USERS: Track profile or password changes
+ALTER TABLE users
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- CITYZEN: Track point or profile activity
+ALTER TABLE cityzen
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- REPORTS: Monitor updates like status, priority, etc.
+ALTER TABLE reports
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- NOTIFICATIONS: Optional — track read status changes or edits
+ALTER TABLE notifications
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- MUNICIPALITY_POST: Optional — if posts are editable
+ALTER TABLE municipality_post
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- CITYZEN_COMMENT: Optional — if comment editing is allowed
+ALTER TABLE cityzen_comment
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
