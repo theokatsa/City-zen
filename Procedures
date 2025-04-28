@@ -1,0 +1,273 @@
+Overview
+
+Procedure	                                         Purpose
+SubmitReport	                                     Submit a new citizen report + notification
+UpdateReportStatus	                               Update a report’s status + award points + notification
+AwardPoints	                                       Add or deduct points and update cityzen
+SubmitRequest	                                     Citizen submits request to municipality
+PublishMunicipalityPost	                           Municipality creates a post and notifies all
+HandleFalseReport	                                 Mark report false and deduct points
+GetUserReportHistory	                             Get citizen’s reports with comments
+SubmitFeedback	                                   Submit feedback via chat/AI system
+
+
+SubmitReport
+
+DELIMITER //
+
+CREATE PROCEDURE SubmitReport (
+    IN p_cityzen_id INT,
+    IN p_latitude DOUBLE,
+    IN p_longitude DOUBLE,
+    IN p_address VARCHAR(255),
+    IN p_category ENUM('lighting', 'roadworks', 'other'),
+    IN p_description TEXT,
+    IN p_priority ENUM('High', 'Medium', 'Low')
+)
+BEGIN
+    DECLARE loc_id INT;
+    DECLARE report_id INT;
+
+    -- Insert location
+    INSERT INTO location (latitude, longitude, address)
+    VALUES (p_latitude, p_longitude, p_address);
+    SET loc_id = LAST_INSERT_ID();
+
+    -- Insert report
+    INSERT INTO reports (cityzen_id, location_id, category, description, priority)
+    VALUES (p_cityzen_id, loc_id, p_category, p_description, p_priority);
+    SET report_id = LAST_INSERT_ID();
+
+    -- Notify user
+    INSERT INTO notifications (user_id, message, action_type, report_id)
+    VALUES (
+        (SELECT user_id FROM cityzen WHERE id = p_cityzen_id),
+        CONCAT('Your report has been submitted successfully. Report ID: ', report_id),
+        'report_submitted',
+        report_id
+    );
+END //
+
+DELIMITER ;
+
+UpdateReportStatus
+
+DELIMITER //
+
+CREATE PROCEDURE UpdateReportStatus (
+    IN p_report_id INT,
+    IN p_new_status ENUM('Pending', 'In Progress', 'Completed')
+)
+BEGIN
+    DECLARE cityzen_id INT;
+    DECLARE user_id INT;
+
+    -- Update status
+    UPDATE reports
+    SET status = p_new_status
+    WHERE id = p_report_id;
+
+    -- Get report owner
+    SELECT cityzen_id INTO cityzen_id FROM reports WHERE id = p_report_id;
+    SELECT user_id INTO user_id FROM cityzen WHERE id = cityzen_id;
+
+    -- If completed, award points
+    IF p_new_status = 'Completed' THEN
+        CALL AwardPoints(user_id, p_report_id, 10, 'Report completed');
+    END IF;
+
+    -- Notify user
+    INSERT INTO notifications (user_id, message, action_type, report_id)
+    VALUES (
+        user_id,
+        CONCAT('Status of your report (ID: ', p_report_id, ') has been updated to ', p_new_status),
+        'status_updated',
+        p_report_id
+    );
+END //
+
+DELIMITER ;
+
+AwardPoints
+
+DELIMITER //
+
+CREATE PROCEDURE AwardPoints (
+    IN p_user_id INT,
+    IN p_report_id INT,
+    IN p_points INT,
+    IN p_reason VARCHAR(255)
+)
+BEGIN
+    -- Insert points history
+    INSERT INTO points (user_id, report_id, points_awarded, reason)
+    VALUES (p_user_id, p_report_id, p_points, p_reason);
+
+    -- Update cityzen points
+    UPDATE cityzen
+    SET points = points + p_points
+    WHERE user_id = p_user_id;
+
+    -- Notify user
+    INSERT INTO notifications (user_id, message, action_type, report_id)
+    VALUES (
+        p_user_id,
+        CONCAT('You have been awarded ', p_points, ' points: ', p_reason),
+        'points_awarded',
+        p_report_id
+    );
+END //
+
+DELIMITER ;
+
+
+SubmitRequest
+
+
+DELIMITER //
+
+CREATE PROCEDURE SubmitRequest (
+    IN p_cityzen_id INT,
+    IN p_municipality_id INT,
+    IN p_description TEXT
+)
+BEGIN
+    -- Insert request
+    INSERT INTO requests (cityzen_id, municipality_id, description, status)
+    VALUES (p_cityzen_id, p_municipality_id, p_description, 'Pending');
+
+    -- Optional: Send notification to municipality (if you track municipality users)
+END //
+
+DELIMITER ;
+
+PublishMunicipalityPost
+
+
+DELIMITER //
+
+CREATE PROCEDURE PublishMunicipalityPost (
+    IN p_municipality_id INT,
+    IN p_title VARCHAR(255),
+    IN p_content TEXT
+)
+BEGIN
+    DECLARE post_id INT;
+
+    -- Insert post
+    INSERT INTO municipality_post (municipality_id, title, content)
+    VALUES (p_municipality_id, p_title, p_content);
+    SET post_id = LAST_INSERT_ID();
+
+    -- Notify all users
+    INSERT INTO notifications (user_id, message, action_type)
+    SELECT id, CONCAT('New municipality announcement: ', p_title), 'admin_announcement'
+    FROM users;
+END //
+
+DELIMITER ;
+
+
+HandleFalseReport
+
+
+DELIMITER //
+
+CREATE PROCEDURE HandleFalseReport (
+    IN p_report_id INT,
+    IN p_is_false BOOLEAN
+)
+BEGIN
+    DECLARE cityzen_id INT;
+    DECLARE user_id INT;
+
+    IF p_is_false THEN
+        -- Mark report as rejected (you could add a new status like 'Rejected' if you want)
+
+        UPDATE reports
+        SET status = 'Pending' -- or create a new ENUM value 'Rejected'
+        WHERE id = p_report_id;
+
+        -- Deduct points
+        SELECT cityzen_id INTO cityzen_id FROM reports WHERE id = p_report_id;
+        SELECT user_id INTO user_id FROM cityzen WHERE id = cityzen_id;
+        
+        CALL AwardPoints(user_id, p_report_id, -10, 'False report penalty');
+
+        -- Send notification
+        INSERT INTO notifications (user_id, message, action_type, report_id)
+        VALUES (
+            user_id,
+            CONCAT('Warning: Your report (ID: ', p_report_id, ') was marked as false. Points deducted.'),
+            'points_deducted',
+            p_report_id
+        );
+    END IF;
+END //
+
+DELIMITER ;
+
+
+
+GetUserReportHistory
+
+
+DELIMITER //
+
+CREATE PROCEDURE GetUserReportHistory (
+    IN p_cityzen_id INT
+)
+BEGIN
+    -- Return report history
+    SELECT 
+        r.id AS report_id,
+        r.description,
+        r.category,
+        r.priority,
+        r.status,
+        r.created_at,
+        c.comment
+    FROM reports r
+    LEFT JOIN cityzen_comment c ON r.id = c.report_id
+    WHERE r.cityzen_id = p_cityzen_id;
+END //
+
+DELIMITER ;
+
+
+SubmitFeedback
+
+DELIMITER //
+
+CREATE PROCEDURE SubmitFeedback (
+    IN p_cityzen_id INT,
+    IN p_report_id INT,
+    IN p_rating TINYINT,
+    IN p_comment TEXT
+)
+BEGIN
+    -- Find or create a conversation (optional logic)
+    DECLARE conv_id INT;
+
+    -- Start a new conversation for feedback
+    INSERT INTO ai_conversation (cityzen_id)
+    VALUES (p_cityzen_id);
+    SET conv_id = LAST_INSERT_ID();
+
+    -- Insert feedback into ai_chat
+    INSERT INTO ai_chat (conversation_id, cityzen_id, message, is_user, report_id, action_type, feedback_rating, user_feedback)
+    VALUES (conv_id, p_cityzen_id, p_comment, TRUE, p_report_id, 'feedback', p_rating, p_comment);
+END //
+
+DELIMITER ;
+
+
+
+
+
+
+
+
+
+
+
