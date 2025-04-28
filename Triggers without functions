@@ -1,1 +1,115 @@
+1)AFTER UPDATE ON reports.status
+
+If status = "Completed":
+
+Notify user
+
+Award points
+
+If status = "Rejected"/"False Report":
+
+Notify user
+
+Deduct points
+
+CREATE TRIGGER after_update_report_status
+AFTER UPDATE ON reports
+FOR EACH ROW
+BEGIN
+    -- Notify user if status is "Completed"
+    IF NEW.status = 'Completed' THEN
+        -- Assuming a `notify_user` function or insert statement to notify the user
+        CALL notify_user(NEW.user_id, 'Your report has been completed.');
+        
+        -- Award points
+        UPDATE points
+        SET points = points + 10 -- Adjust the points increment value as needed
+        WHERE user_id = NEW.user_id;
+        
+    -- Notify user if status is "Rejected" or "False Report"
+    ELSEIF NEW.status IN ('Rejected', 'False Report') THEN
+        -- Assuming a `notify_user` function or insert statement to notify the user
+        CALL notify_user(NEW.user_id, 'Your report has been rejected or marked as false.');
+        
+        -- Deduct points
+        UPDATE points
+        SET points = points - 5 -- Adjust the points deduction value as needed
+        WHERE user_id = NEW.user_id;
+    END IF;
+END;
+
+
+2)AFTER INSERT ON reports
+
+Notify user: "Your report has been submitted."
+
+CREATE TRIGGER after_insert_report
+AFTER INSERT ON reports
+FOR EACH ROW
+BEGIN
+    -- Notify user: "Your report has been submitted."
+    CALL notify_user(NEW.user_id, 'Your report has been submitted.');
+END;
+
+
+3)AFTER INSERT ON points
+
+Recalculate and update cityzen.points total
+
+CREATE TRIGGER after_insert_points
+AFTER INSERT ON points
+FOR EACH ROW
+BEGIN
+    -- Recalculate and update total points for the user
+    DECLARE total_points INT;
+    
+    -- Get total points for the user
+    SELECT SUM(points) INTO total_points
+    FROM points
+    WHERE user_id = NEW.user_id;
+    
+    -- Update the total points for the user
+    UPDATE cityzen
+    SET points = total_points
+    WHERE user_id = NEW.user_id;
+END;
+
+
+
+4)AFTER INSERT ON municipality_post
+
+Notify all users: "New announcement posted."
+
+CREATE TRIGGER after_insert_municipality_post
+AFTER INSERT ON municipality_post
+FOR EACH ROW
+BEGIN
+    -- Notify all users about a new announcement
+    -- Assuming a `notify_all_users` function to send the announcement
+    CALL notify_all_users('New announcement posted.');
+END;
+
+
+
+5)AFTER INSERT ON ai_chat
+
+Log message
+
+If feedback rating exists, update satisfaction stats
+
+CREATE TRIGGER after_insert_ai_chat
+AFTER INSERT ON ai_chat
+FOR EACH ROW
+BEGIN
+    -- Log message to chat logs
+    INSERT INTO chat_logs (user_id, message) 
+    VALUES (NEW.user_id, NEW.message);
+
+    -- If feedback exists, update satisfaction stats
+    IF NEW.feedback_rating IS NOT NULL THEN
+        UPDATE satisfaction_stats
+        SET average_rating = (SELECT AVG(feedback_rating) FROM ai_chat WHERE user_id = NEW.user_id)
+        WHERE user_id = NEW.user_id;
+    END IF;
+END;
 
