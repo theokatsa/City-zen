@@ -1,0 +1,156 @@
+Functions
+notify_user(user_id, message) sends a notification to a specific user.
+
+CREATE FUNCTION notify_user(user_id INT, message VARCHAR(255))
+RETURNS VOID
+BEGIN
+    -- Insert a new notification record for the user
+    INSERT INTO notifications (user_id, message, created_at)
+    VALUES (user_id, message, NOW());
+END;
+
+
+notify_all_users(message) sends a notification to all users.
+
+CREATE FUNCTION notify_all_users(message VARCHAR(255))
+RETURNS VOID
+BEGIN
+    -- Insert a new notification record for each user
+    DECLARE done INT DEFAULT 0;
+    DECLARE user_id INT;
+    DECLARE cur CURSOR FOR SELECT user_id FROM users;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+    
+    OPEN cur;
+    
+    read_loop: LOOP
+        FETCH cur INTO user_id;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+        
+        -- Insert notification for each user
+        INSERT INTO notifications (user_id, message, created_at)
+        VALUES (user_id, message, NOW());
+    END LOOP;
+    
+    CLOSE cur;
+END;
+
+
+log_chat_message(user_id, message) logs a message from the AI chat.
+
+CREATE FUNCTION log_chat_message(user_id INT, message TEXT)
+RETURNS VOID
+BEGIN
+    -- Insert the message into the chat logs table
+    INSERT INTO chat_logs (user_id, message, timestamp)
+    VALUES (user_id, message, NOW());
+END;
+
+
+update_satisfaction_stats(user_id) calculates and updates the average feedback rating for a user.
+
+CREATE FUNCTION update_satisfaction_stats(user_id INT)
+RETURNS VOID
+BEGIN
+    DECLARE avg_rating FLOAT;
+
+    -- Calculate the average feedback rating for the user
+    SELECT AVG(feedback_rating) INTO avg_rating
+    FROM ai_chat
+    WHERE user_id = user_id;
+
+    -- Update the user's satisfaction stats
+    UPDATE satisfaction_stats
+    SET average_rating = avg_rating
+    WHERE user_id = user_id;
+END;
+
+
+Triggers with functions
+
+1)AFTER UPDATE ON reports.status
+
+CREATE TRIGGER after_update_report_status
+AFTER UPDATE ON reports
+FOR EACH ROW
+BEGIN
+    -- Notify user if status is "Completed"
+    IF NEW.status = 'Completed' THEN
+        CALL notify_user(NEW.user_id, 'Your report has been completed.');
+        
+        -- Award points
+        UPDATE points
+        SET points = points + 10
+        WHERE user_id = NEW.user_id;
+        
+    -- Notify user if status is "Rejected" or "False Report"
+    ELSEIF NEW.status IN ('Rejected', 'False Report') THEN
+        CALL notify_user(NEW.user_id, 'Your report has been rejected or marked as false.');
+        
+        -- Deduct points
+        UPDATE points
+        SET points = points - 5
+        WHERE user_id = NEW.user_id;
+    END IF;
+END;
+
+
+2)AFTER INSERT ON reports
+
+CREATE TRIGGER after_insert_report
+AFTER INSERT ON reports
+FOR EACH ROW
+BEGIN
+    -- Notify user: "Your report has been submitted."
+    CALL notify_user(NEW.user_id, 'Your report has been submitted.');
+END;
+
+
+3)AFTER INSERT ON points
+
+CREATE TRIGGER after_insert_points
+AFTER INSERT ON points
+FOR EACH ROW
+BEGIN
+    DECLARE total_points INT;
+    
+    -- Get total points for the user
+    SELECT SUM(points) INTO total_points
+    FROM points
+    WHERE user_id = NEW.user_id;
+    
+    -- Update the total points for the user
+    UPDATE cityzen
+    SET points = total_points
+    WHERE user_id = NEW.user_id;
+END;
+
+
+4)AFTER INSERT ON municipality_post
+
+CREATE TRIGGER after_insert_municipality_post
+AFTER INSERT ON municipality_post
+FOR EACH ROW
+BEGIN
+    -- Notify all users about a new announcement
+    CALL notify_all_users('New announcement posted.');
+END;
+
+
+
+5)AFTER INSERT ON ai_chat
+
+CREATE TRIGGER after_insert_ai_chat
+AFTER INSERT ON ai_chat
+FOR EACH ROW
+BEGIN
+    -- Log the message to chat logs
+    CALL log_chat_message(NEW.user_id, NEW.message);
+
+    -- If feedback exists, update satisfaction stats
+    IF NEW.feedback_rating IS NOT NULL THEN
+        CALL update_satisfaction_stats(NEW.user_id);
+    END IF;
+END;
