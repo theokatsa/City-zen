@@ -1,4 +1,8 @@
--- Table for Users
+DROP DATABASE IF EXISTS Cityzen;
+CREATE DATABASE Cityzen;
+USE Cityzen;
+
+-- table for users
 CREATE TABLE user (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(100) NOT NULL UNIQUE,
@@ -8,36 +12,39 @@ CREATE TABLE user (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table for citizens
-CREATE TABLE citizen (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
-    points INT DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
--- Table for Municipality/Public Authorities
+-- table for municipality
 CREATE TABLE municipality (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
-    name VARCHAR(100) NOT NULL,
+    municipality VARCHAR(100) NOT NULL,
     contact_email VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
--- Table for Location
-CREATE TABLE location (
+-- table for citizens
+CREATE TABLE citizen (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL UNIQUE,
     municipality_id INT NOT NULL,
-    latitude DOUBLE NOT NULL,
-    longitude DOUBLE NOT NULL,
-    address VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    name VARCHAR(100),
+    points INT DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
     FOREIGN KEY (municipality_id) REFERENCES municipality(id) ON DELETE CASCADE
 );
 
--- Table for Reports
+
+
+-- table for location
+CREATE TABLE location (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    latitude DOUBLE NOT NULL,
+    longitude DOUBLE NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- table for reports
 CREATE TABLE report (
     id INT AUTO_INCREMENT PRIMARY KEY,
     citizen_id INT NOT NULL,
@@ -45,12 +52,13 @@ CREATE TABLE report (
     category ENUM('Lighting', 'Roadworks', 'Other') NOT NULL DEFAULT 'Other',
     description TEXT NOT NULL,
     priority ENUM('High', 'Medium', 'Low') NOT NULL DEFAULT 'Medium',
-    status ENUM('Pending', 'In Progress', 'Completed') NOT NULL DEFAULT 'Pending',
+    status ENUM('Pending', 'Rejected', 'In Progress', 'Completed') NOT NULL DEFAULT 'Pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (citizen_id) REFERENCES citizen(id),
     FOREIGN KEY (location_id) REFERENCES location(id)
     );
 
+-- table for report media
 CREATE TABLE report_media (
     id INT AUTO_INCREMENT PRIMARY KEY,
     report_id INT NOT NULL,
@@ -60,7 +68,7 @@ CREATE TABLE report_media (
     FOREIGN KEY (report_id) REFERENCES report(id) ON DELETE CASCADE
 );
 
--- Table for Municipality Announcements
+-- table for municipality announcements
 CREATE TABLE municipality_post (
     id INT AUTO_INCREMENT PRIMARY KEY,
     municipality_id INT NOT NULL,
@@ -71,7 +79,17 @@ CREATE TABLE municipality_post (
     FOREIGN KEY (municipality_id) REFERENCES municipality(id)
 );
 
--- Table for AI Chat
+-- table for ai conversation
+CREATE TABLE ai_conversation (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    citizen_id INT NOT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    resolved BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id)
+);
+
+-- table for ai chat
 CREATE TABLE ai_chat (
     id INT AUTO_INCREMENT PRIMARY KEY,
     conversation_id INT NOT NULL,
@@ -88,18 +106,8 @@ CREATE TABLE ai_chat (
     FOREIGN KEY (report_id) REFERENCES report(id)
 );
 
--- Table for AI conversation
-CREATE TABLE ai_conversation (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    citizen_id INT NOT NULL,
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ended_at TIMESTAMP,
-    resolved BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (citizen_id) REFERENCES citizen(id)
-);
-
--- Table for Notification
-CREATE TABLE notifications (
+-- table for notifications
+CREATE TABLE notification (
     id INT AUTO_INCREMENT PRIMARY KEY,
     citizen_id INT NOT NULL,
     report_id INT DEFAULT NULL,
@@ -116,10 +124,10 @@ CREATE TABLE notifications (
     ) NOT NULL,
     link_url VARCHAR(255),
     FOREIGN KEY (citizen_id) REFERENCES citizen(id),
-    FOREIGN KEY (report_id) REFERENCES reports(id)
+    FOREIGN KEY (report_id) REFERENCES report(id)
 );
 
--- Table for Requests
+-- table for requests
 CREATE TABLE request (
     id INT AUTO_INCREMENT PRIMARY KEY,
     citizen_id INT NOT NULL,
@@ -132,18 +140,20 @@ CREATE TABLE request (
     FOREIGN KEY (municipality_id) REFERENCES municipality(id)
 );
 
--- Table for citizen Comments
+-- table for citizen comments
 CREATE TABLE citizen_comment (
     id INT AUTO_INCREMENT PRIMARY KEY,
     report_id INT NOT NULL,
     citizen_id INT NOT NULL,
+    parent_comment_id INT NULL,
     comment TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (report_id) REFERENCES report(id),
-    FOREIGN KEY (citizen_id) REFERENCES citizen(id)
+    FOREIGN KEY (citizen_id) REFERENCES citizen(id),
+    FOREIGN KEY (parent_comment_id) REFERENCES citizen_comment(id) ON DELETE CASCADE
 );
 
--- Table for Points (Awarded/Deducted Points)
+-- table for points
 CREATE TABLE points (
     id INT AUTO_INCREMENT PRIMARY KEY,
     citizen_id INT NOT NULL,
@@ -152,11 +162,11 @@ CREATE TABLE points (
     reason VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (citizen_id) REFERENCES citizen(id),
-    FOREIGN KEY (report_id) REFERENCES reports(id)
+    FOREIGN KEY (report_id) REFERENCES report(id)
 );
 
 
--- Table for report rating
+-- table for report rating
 CREATE TABLE report_rating (
     id INT AUTO_INCREMENT PRIMARY KEY,
     report_id INT NOT NULL UNIQUE,
@@ -171,7 +181,7 @@ CREATE TABLE report_rating (
 );
 
 
--- Table for false report
+-- table for false reports
 CREATE TABLE false_report (
     id INT AUTO_INCREMENT PRIMARY KEY,
     report_id INT NOT NULL UNIQUE,
@@ -181,7 +191,7 @@ CREATE TABLE false_report (
 );
 
 
--- Table for penalty
+-- table for penalties
 CREATE TABLE penalty (
     id INT AUTO_INCREMENT PRIMARY KEY,
     citizen_id INT NOT NULL,
@@ -190,11 +200,11 @@ CREATE TABLE penalty (
     reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (citizen_id) REFERENCES citizen(id),
-    FOREIGN KEY (false_report_id) REFERENCES false_report(id)
+    FOREIGN KEY (false_report_id) REFERENCES report(id)
 );
 
 
--- Table for point redemption
+-- table for point redemptions
 CREATE TABLE points_redemption (
     id INT AUTO_INCREMENT PRIMARY KEY,
     citizen_id INT NOT NULL,
@@ -205,7 +215,7 @@ CREATE TABLE points_redemption (
 );
 
 
--- Table for municipality comment
+-- table for municipality comments
 CREATE TABLE municipality_comment (
     id INT AUTO_INCREMENT PRIMARY KEY,
     municipality_id INT NOT NULL,
@@ -218,100 +228,44 @@ CREATE TABLE municipality_comment (
 
 
 
-
-
-
-
-
--- Citizen creates account 
-
-CREATE PROCEDURE CreateCitizen(
-    IN p_username VARCHAR(100),
-    IN p_password_hash VARCHAR(255),
-    IN p_email VARCHAR(100),
-    IN p_telephone_number VARCHAR(20)
-)
-BEGIN
-    INSERT INTO user (username, password_hash, email, telephone_number)
-    VALUES (p_username, p_password_hash, p_email, p_telephone_number);
-
-    INSERT INTO citizen (user_id)
-    VALUES (LAST_INSERT_ID());
-END;
-
--- Municipality employee creates account
-
-CREATE PROCEDURE CreateMunicipality(
-    IN p_username VARCHAR(100),
-    IN p_password_hash VARCHAR(255),
-    IN p_email VARCHAR(100),
-    IN p_telephone_number VARCHAR(20),
-    IN p_name VARCHAR(100),
-    IN p_contact_email VARCHAR(100)
-)
-BEGIN
-    INSERT INTO user (username, password_hash, email, telephone_number)
-    VALUES (p_username, p_password_hash, p_email, p_telephone_number);
-
-    INSERT INTO municipality (user_id, name, contact_email)
-    VALUES (LAST_INSERT_ID(), p_name, p_contact_email);
-END;
-
-
--- Citizen submits a report 
-
+-- citizen submits report and gets notification 
 DELIMITER //
 
-CREATE PROCEDURE CreateReport(
+CREATE PROCEDURE SubmitReport (
     IN p_citizen_id INT,
-    IN p_location_id INT,
-    IN p_category ENUM('Lighting', 'Roadworks', 'Other'),
+    IN p_latitude DOUBLE,
+    IN p_longitude DOUBLE,
+    IN p_address VARCHAR(255),
+    IN p_category ENUM('lighting', 'roadworks', 'other'),
     IN p_description TEXT,
     IN p_priority ENUM('High', 'Medium', 'Low'),
     IN p_media_url VARCHAR(500),
     IN p_media_type ENUM('image', 'video')
 )
 BEGIN
-    DECLARE new_report_id INT;
+    DECLARE loc_id INT;
+    DECLARE report_id INT;
+
+    INSERT INTO location (latitude, longitude, address)
+    VALUES (p_latitude, p_longitude, p_address);
+    SET loc_id = LAST_INSERT_ID();
 
     INSERT INTO report (citizen_id, location_id, category, description, priority)
-    VALUES (p_citizen_id, p_location_id, p_category, p_description, p_priority);
+    VALUES (p_citizen_id, loc_id, p_category, p_description, p_priority);
+    SET report_id = LAST_INSERT_ID();
 
-    SET new_report_id = LAST_INSERT_ID();
-
-    IF p_media_url IS NOT NULL THEN
+    IF p_media_url IS NOT NULL AND p_media_url != '' THEN
         INSERT INTO report_media (report_id, media_url, media_type)
-        VALUES (new_report_id, p_media_url, p_media_type);
+        VALUES (report_id, p_media_url, p_media_type);
     END IF;
-END //
 
-DELIMITER ;
-
-
-
--- Citizen views report history
-
-DELIMITER //
-
-CREATE PROCEDURE GetCitizenReports(
-    IN p_citizen_id INT
-)
-BEGIN
-    SELECT 
-        r.id AS report_id,
-        r.description,
-        r.category,
-        r.priority,
-        r.status,
-        r.created_at,
-        (
-            SELECT GROUP_CONCAT(rm.media_url SEPARATOR ', ')
-            FROM report_media rm
-            WHERE rm.report_id = r.id
-        ) AS media_urls
-    FROM report r
-    WHERE r.citizen_id = p_citizen_id
-    ORDER BY r.created_at DESC;
+    INSERT INTO notification (citizen_id, message, action_type, report_id)
+    VALUES (
+        p_citizen_id,
+        CONCAT('Your report has been submitted successfully. Report ID: ', report_id),
+        'report_submitted',
+        report_id
+    );
 END //
 
 DELIMITER ;
@@ -319,30 +273,73 @@ DELIMITER ;
 
 
 
--- Citizen earns points from true report 
 
+-- municipality changes status, citizen gets notified and if new status is 'in progress' gets awarded points, if it is 'rejected' gets deducted points
 DELIMITER //
 
-CREATE PROCEDURE AwardPoints(
+CREATE PROCEDURE UpdateReportStatus (
+    IN p_report_id INT,
     IN p_citizen_id INT,
-    IN p_points_awarded INT,
-    IN p_reason VARCHAR(255),
-    IN p_report_id INT
+    IN p_new_status ENUM('Pending', 'Rejected', 'In Progress', 'Completed')
 )
 BEGIN
-    INSERT INTO points (citizen_id, points_awarded, reason, report_id)
-    VALUES (p_citizen_id, p_points_awarded, p_reason, p_report_id);
+    UPDATE report
+    SET status = p_new_status
+    WHERE id = p_report_id;
+
+    IF p_new_status = 'In progress' THEN
+        CALL AwardPoints(p_citizen_id, p_report_id, 10, 'Report completed');
+    END IF;
+
+    IF p_new_status = 'Rejected' THEN
+        CALL DeductPoints(p_citizen_id, p_report_id, 10, 'Report was rejected');
+    END IF;
+
+    INSERT INTO notification (citizen_id, message, action_type, report_id)
+    VALUES (
+        p_citizen_id,
+        CONCAT('Status of your report (ID: ', p_report_id, ') has been updated to ', p_new_status),
+        'status_updated',
+        p_report_id
+    );
+END //
+
+DELIMITER ;
+
+
+
+
+-- citizen gets awarded points and gets notification
+DELIMITER //
+
+CREATE PROCEDURE AwardPoints (
+    IN p_citizen_id INT,
+    IN p_report_id INT,
+    IN p_points INT,
+    IN p_reason VARCHAR(255)
+)
+BEGIN
+    INSERT INTO points (citizen_id, report_id, points_awarded, reason)
+    VALUES (p_citizen_id, p_report_id, p_points, p_reason);
 
     UPDATE citizen
-    SET points = points + p_points_awarded
+    SET points = points + p_points
     WHERE id = p_citizen_id;
+
+    INSERT INTO notification (citizen_id, message, action_type, report_id)
+    VALUES (
+        p_citizen_id,
+        CONCAT('You have been awarded ', p_points, ' points: ', p_reason),
+        'points_awarded',
+        p_report_id
+    );
 END //
 
 DELIMITER ;
 
 
--- Citizens loses points from false report
 
+-- citizen gets deducted points and gets notification
 DELIMITER //
 
 CREATE PROCEDURE DeductPoints(
@@ -358,13 +355,255 @@ BEGIN
     UPDATE citizen
     SET points = points - p_points_deducted
     WHERE id = p_citizen_id;
+
+    INSERT INTO notification (citizen_id, message, action_type, report_id)
+    VALUES (
+        p_citizen_id,
+        CONCAT('Warning: ', p_points_deducted, ' points deducted. Reason: ', p_reason),
+        'points_deducted',
+        p_false_report_id
+    );
 END //
 
 DELIMITER ;
 
 
--- Municipality views reports 
 
+-- citizen submits a request 
+DELIMITER //
+
+CREATE PROCEDURE SubmitRequest (
+    IN p_citizen_id INT,
+    IN p_municipality_id INT,
+    IN p_description TEXT
+)
+BEGIN
+    DECLARE new_request_id INT;
+
+    INSERT INTO request (citizen_id, municipality_id, description, status)
+    VALUES (p_citizen_id, p_municipality_id, p_description, 'Pending');
+    SET new_request_id = LAST_INSERT_ID();
+
+    INSERT INTO notification (citizen_id, message, action_type, link_url)
+    VALUES (
+        p_citizen_id,
+        CONCAT('Your request has been submitted successfully. Request ID: ', new_request_id),
+        'general',
+        CONCAT('/requests/', new_request_id)  
+    );
+END //
+
+DELIMITER ;
+
+
+
+DELIMITER //
+
+CREATE PROCEDURE PublishMunicipalityPost (
+    IN p_municipality_id INT,
+    IN p_title VARCHAR(255),
+    IN p_content TEXT,
+    IN p_media_url VARCHAR(500)
+)
+BEGIN
+    DECLARE post_id INT;
+
+    INSERT INTO municipality_post (municipality_id, title, text, media_url)
+    VALUES (p_municipality_id, p_title, p_content, p_media_url);
+    SET post_id = LAST_INSERT_ID();
+
+    INSERT INTO notification (citizen_id, message, action_type)
+    SELECT id, CONCAT('New municipality announcement: ', p_title), 'admin_announcement'
+    FROM citizen;
+END //
+
+DELIMITER ;
+
+
+
+
+-- citizen views other citizens' reports that are in progress
+DELIMITER //
+
+CREATE PROCEDURE GetOtherCitizensInProgressReports (
+    IN p_citizen_id INT
+)
+BEGIN
+    DECLARE v_municipality_id INT;
+
+    SELECT municipality_id INTO v_municipality_id
+    FROM citizen
+    WHERE id = p_citizen_id;
+
+    SELECT 
+        r.id AS report_id,
+        r.description,
+        r.status,
+        r.created_at,
+        l.address AS location_address,
+        l.latitude,
+        l.longitude,
+        c.id AS reporter_id,
+        c.name AS reporter_name,
+        GROUP_CONCAT(DISTINCT rm.media_url SEPARATOR ', ') AS media_urls,
+        GROUP_CONCAT(DISTINCT CONCAT(cc.comment, ' (by Citizen ID: ', cc.citizen_id, ')') SEPARATOR ' || ') AS comments
+    FROM report r
+    JOIN citizen c ON r.citizen_id = c.id
+    JOIN location l ON r.location_id = l.id
+    LEFT JOIN report_media rm ON r.id = rm.report_id
+    LEFT JOIN citizen_comment cc ON r.id = cc.report_id
+    WHERE r.status = 'In Progress'
+      AND c.municipality_id = v_municipality_id
+      AND c.id != p_citizen_id
+    GROUP BY r.id
+    ORDER BY r.created_at ASC;
+END //
+
+DELIMITER ;
+
+
+
+-- citizen comments on another citizen's report and citizen gets notification
+DELIMITER //
+
+CREATE PROCEDURE AddCitizenComment (
+    IN p_citizen_id INT,
+    IN p_report_id INT,
+    IN p_comment TEXT
+)
+BEGIN
+    DECLARE report_owner_id INT;
+
+    INSERT INTO citizen_comment (report_id, citizen_id, comment)
+    VALUES (p_report_id, p_citizen_id, p_comment);
+
+    SELECT citizen_id INTO report_owner_id
+    FROM report
+    WHERE id = p_report_id;
+
+    IF report_owner_id IS NOT NULL AND report_owner_id != p_citizen_id THEN
+        INSERT INTO notification (citizen_id, message, action_type, report_id)
+        VALUES (
+            report_owner_id,
+            CONCAT('Another citizen commented on your report (ID: ', p_report_id, ').'),
+            'general',
+            p_report_id
+        );
+    END IF;
+END //
+
+DELIMITER ;
+
+
+
+-- citizen submits feedback in ai chat
+DELIMITER //
+
+CREATE PROCEDURE SubmitFeedback (
+    IN p_citizen_id INT,
+    IN p_report_id INT,
+    IN p_rating TINYINT,
+    IN p_comment TEXT
+)
+BEGIN
+    DECLARE conv_id INT;
+
+    INSERT INTO ai_conversation (citizen_id)
+    VALUES (p_citizen_id);
+    SET conv_id = LAST_INSERT_ID();
+
+    INSERT INTO ai_chat (conversation_id, citizen_id, message, is_user, report_id, action_type, feedback_rating, user_feedback)
+    VALUES (conv_id, p_citizen_id, p_comment, TRUE, p_report_id, 'feedback', p_rating, p_comment);
+END //
+
+DELIMITER ;
+
+
+
+-- citizen creates account 
+DELIMITER //
+
+CREATE PROCEDURE CreateCitizen(
+    IN p_username VARCHAR(100),
+    IN p_password_hash VARCHAR(255),
+    IN p_email VARCHAR(100),
+    IN p_telephone_number VARCHAR(20),
+    IN p_municipality_id INT
+)
+BEGIN
+    INSERT INTO user (username, password_hash, email, telephone_number)
+    VALUES (p_username, p_password_hash, p_email, p_telephone_number);
+
+    INSERT INTO citizen (user_id, municipality_id)
+    VALUES (LAST_INSERT_ID(), p_municipality_id);
+END //
+
+DELIMITER ;
+
+
+
+-- municipality creates account 
+DELIMITER // 
+
+CREATE PROCEDURE CreateMunicipality(
+    IN p_username VARCHAR(100),
+    IN p_password_hash VARCHAR(255),
+    IN p_email VARCHAR(100),
+    IN p_telephone_number VARCHAR(20),
+    IN p_municipality VARCHAR(100),
+    IN p_contact_email VARCHAR(100)
+)
+BEGIN
+    INSERT INTO user (username, password_hash, email, telephone_number)
+    VALUES (p_username, p_password_hash, p_email, p_telephone_number);
+
+    INSERT INTO municipality (user_id, municipality, contact_email)
+    VALUES (LAST_INSERT_ID(), p_municipality, p_contact_email);
+END //
+
+DELIMITER ;
+
+
+
+-- citizen views their own reports 
+DELIMITER //
+
+CREATE PROCEDURE GetCitizenReports(
+    IN p_citizen_id INT
+)
+BEGIN
+    SELECT 
+        r.id AS report_id,
+        r.description,
+        r.category,
+        r.priority,
+        r.status,
+        r.created_at,
+        l.address AS location_address,
+        l.latitude,
+        l.longitude,
+        (
+            SELECT GROUP_CONCAT(rm.media_url SEPARATOR ', ')
+            FROM report_media rm
+            WHERE rm.report_id = r.id
+        ) AS media_urls,
+        (
+            SELECT GROUP_CONCAT(CONCAT(cit.name, ': ', cc.comment) SEPARATOR ' || ')
+            FROM citizen_comment cc
+            JOIN citizen cit ON cit.id = cc.citizen_id
+            WHERE cc.report_id = r.id
+        ) AS comments
+    FROM report r
+    JOIN location l ON r.location_id = l.id
+    WHERE r.citizen_id = p_citizen_id
+    ORDER BY r.created_at DESC;
+END //
+
+DELIMITER ;
+
+
+
+-- municipality views citizens' reports 
 DELIMITER //
 
 CREATE PROCEDURE GetReportsForMunicipality(
@@ -385,10 +624,17 @@ BEGIN
             SELECT GROUP_CONCAT(rm.media_url SEPARATOR ', ')
             FROM report_media rm
             WHERE rm.report_id = r.id
-        ) AS media_urls
+        ) AS media_urls,
+        (
+            SELECT GROUP_CONCAT(CONCAT(cit.name, ': ', cc.comment) SEPARATOR ' || ')
+            FROM citizen_comment cc
+            JOIN citizen cit ON cit.id = cc.citizen_id
+            WHERE cc.report_id = r.id
+        ) AS comments
     FROM report r
     INNER JOIN location l ON r.location_id = l.id
-    WHERE l.municipality_id = p_municipality_id
+    INNER JOIN citizen c ON r.citizen_id = c.id
+    WHERE c.municipality_id = p_municipality_id
     ORDER BY r.created_at DESC;
 END //
 
@@ -396,9 +642,7 @@ DELIMITER ;
 
 
 
-
--- Municipality comments on reports
-
+-- municipality comments on a report and citizen gets notified 
 DELIMITER //
 
 CREATE PROCEDURE AddMunicipalityComment(
@@ -407,12 +651,10 @@ CREATE PROCEDURE AddMunicipalityComment(
     IN p_comment TEXT
 )
 BEGIN
-
     INSERT INTO municipality_comment (municipality_id, report_id, comment)
     VALUES (p_municipality_id, p_report_id, p_comment);
 
- 
-    INSERT INTO notifications (citizen_id, report_id, message, action_type)
+    INSERT INTO notification (citizen_id, report_id, message, action_type)
     SELECT r.citizen_id, r.id, CONCAT('Υπάρχει νέο σχόλιο από τον Δήμο στη αναφορά σας.'), 'general'
     FROM report r
     WHERE r.id = p_report_id;
@@ -423,26 +665,7 @@ DELIMITER ;
 
 
 
--- Municipality changes report status 
-
-DELIMITER //
-
-CREATE PROCEDURE UpdateReportStatus(
-    IN p_report_id INT,
-    IN p_new_status ENUM('Pending', 'In Progress', 'Completed')
-)
-BEGIN
-    UPDATE report
-    SET status = p_new_status
-    WHERE id = p_report_id;
-END //
-
-DELIMITER ;
-
-  
-
--- Citizen spends awarded points 
-
+-- citizen redeems points 
 DELIMITER //
 
 CREATE PROCEDURE RedeemPoints(
@@ -455,13 +678,13 @@ BEGIN
 
     SELECT points INTO current_points
     FROM citizen
-    WHERE user_id = p_citizen_id;
+    WHERE id = p_citizen_id;
 
     IF current_points >= p_points_spent THEN
         
         UPDATE citizen
         SET points = points - p_points_spent
-        WHERE user_id = p_citizen_id;
+        WHERE id = p_citizen_id;
 
         INSERT INTO points_redemption (citizen_id, points_spent, reward_description)
         VALUES (p_citizen_id, p_points_spent, p_reward_description);
@@ -472,93 +695,151 @@ END //
 
 DELIMITER ;
 
--- Citizen views all notifications 
 
-CREATE PROCEDURE GetCitizenNotifications(
+
+-- citizen views how many points they have
+DELIMITER //
+
+CREATE PROCEDURE GetCitizenPoints(
     IN p_citizen_id INT
 )
 BEGIN
-    SELECT * FROM notifications
-    WHERE citizen_id = p_citizen_id
-    ORDER BY created_at DESC;
-END;
-
-
-
-
-
-
-
-
--- Notify when a report is submitted 
-
-DELIMITER //
-
-CREATE TRIGGER after_report_insert
-AFTER INSERT ON report
-FOR EACH ROW
-BEGIN
-    INSERT INTO notifications (citizen_id, report_id, message, action_type)
-    VALUES (NEW.citizen_id, NEW.id, 'Η αναφορά σας καταχωρήθηκε επιτυχώς.', 'report_submitted');
+    SELECT points
+    FROM citizen
+    WHERE id = p_citizen_id;
 END //
 
 DELIMITER ;
 
--- Notify when report status changes 
 
+
+-- citizen views all notifications
 DELIMITER //
 
-CREATE TRIGGER after_report_update_status
-AFTER UPDATE ON report
-FOR EACH ROW
+
+
+-- citizen views all notifications
+CREATE PROCEDURE GetCitizenNotifications(
+    IN p_citizen_id INT
+)
 BEGIN
-    IF OLD.status <> NEW.status THEN
-        INSERT INTO notifications (citizen_id, report_id, message, action_type)
-        VALUES (NEW.citizen_id, NEW.id, CONCAT('Το status της αναφοράς σας άλλαξε σε ', NEW.status), 'status_updated');
+    SELECT * FROM notification
+    WHERE citizen_id = p_citizen_id
+    ORDER BY created_at DESC;
+END //
+
+DELIMITER ;
+
+
+
+-- ai conversation is ended if the issue is resolved 
+DELIMITER //
+
+CREATE PROCEDURE EndAIConversation (
+    IN p_conversation_id INT
+)
+BEGIN
+    UPDATE ai_conversation
+    SET ended_at = CURRENT_TIMESTAMP, resolved = TRUE
+    WHERE id = p_conversation_id;
+END //
+
+DELIMITER ;
+
+
+
+-- ai conversation is ended if user is inactive for more than one hour
+DELIMITER //
+
+CREATE EVENT auto_close_inactive_conversations
+ON SCHEDULE EVERY 5 MINUTE
+DO
+BEGIN
+    UPDATE ai_conversation ac
+    SET ac.ended_at = CURRENT_TIMESTAMP, ac.resolved = FALSE
+    WHERE ac.ended_at IS NULL
+      AND (
+          SELECT MAX(chat.created_at)
+          FROM ai_chat chat
+          WHERE chat.conversation_id = ac.id
+      ) < NOW() - INTERVAL 1 HOUR;
+END //
+
+DELIMITER ;
+
+
+
+-- citizen edits profile 
+DELIMITER //
+
+CREATE PROCEDURE EditCitizenFullProfileWithPassword (
+    IN p_citizen_id INT,
+    IN p_new_name VARCHAR(100),
+    IN p_new_municipality_id INT,
+    IN p_new_username VARCHAR(100),
+    IN p_new_email VARCHAR(100),
+    IN p_new_telephone_number VARCHAR(20),
+    IN p_new_password_hash VARCHAR(255)
+)
+BEGIN
+    DECLARE v_user_id INT;
+
+    SELECT user_id INTO v_user_id
+    FROM citizen
+    WHERE id = p_citizen_id;
+
+    UPDATE citizen
+    SET 
+        name = p_new_name,
+        municipality_id = p_new_municipality_id
+    WHERE id = p_citizen_id;
+
+    UPDATE user
+    SET 
+        username = p_new_username,
+        email = p_new_email,
+        telephone_number = p_new_telephone_number,
+        password_hash = p_new_password_hash
+    WHERE id = v_user_id;
+END //
+
+DELIMITER ;
+
+
+
+-- citizen replies to a citizen that has commented under their report 
+DELIMITER //
+
+CREATE PROCEDURE ReplyToCitizenComment (
+    IN p_citizen_id INT,
+    IN p_report_id INT,
+    IN p_parent_comment_id INT,
+    IN p_reply_text TEXT
+)
+BEGIN
+    DECLARE original_commenter_id INT;
+
+    INSERT INTO citizen_comment (report_id, citizen_id, comment, parent_comment_id)
+    VALUES (p_report_id, p_citizen_id, p_reply_text, p_parent_comment_id);
+
+    SELECT citizen_id INTO original_commenter_id
+    FROM citizen_comment
+    WHERE id = p_parent_comment_id;
+
+    IF original_commenter_id IS NOT NULL AND original_commenter_id != p_citizen_id THEN
+        INSERT INTO notification (citizen_id, message, action_type, report_id)
+        VALUES (
+            original_commenter_id,
+            CONCAT('A citizen replied to your comment on report ID ', p_report_id),
+            'general',
+            p_report_id
+        );
     END IF;
 END //
 
 DELIMITER ;
 
--- Citizen earns points when rating a report service
-
-DELIMITER //
-
-CREATE TRIGGER after_report_rating_insert
-AFTER INSERT ON report_rating
-FOR EACH ROW
-BEGIN
-    UPDATE citizen
-    SET points = points + 10
-    WHERE id = NEW.citizen_id;
-
-    INSERT INTO points (citizen_id, points_awarded, reason, report_id)
-    VALUES (NEW.citizen_id, 10, 'Bonus για αξιολόγηση αναφοράς', NEW.report_id);
-END //
-
-DELIMITER ;
 
 
--- Citizen loses points from false report 
 
-DELIMITER //
 
-CREATE TRIGGER Trigger_False_Report_Penalty
-AFTER INSERT ON false_report
-FOR EACH ROW
-BEGIN
-    DECLARE citizenId INT;
-
-    SELECT citizen_id INTO citizenId
-    FROM report
-    WHERE id = NEW.report_id;
-
-    INSERT INTO penalty (citizen_id, false_report_id, points_deducted, reason)
-    VALUES (citizenId, NEW.id, 50, 'False report detected');
-
-    UPDATE citizen
-    SET points = points - 50
-    WHERE id = citizenId;
-END //
-
-DELIMITER ;
